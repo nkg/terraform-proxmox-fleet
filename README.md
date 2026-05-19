@@ -43,8 +43,8 @@ works fine if the top-level orchestration doesn't fit.
 module "fleet" {
   source = "github.com/nkg/terraform-proxmox-github-actions-runner?ref=v1.0.0"
 
-  node_name = "vaterland"
-  gateway   = "172.16.0.1"
+  node_name = "pve-01"
+  gateway   = "192.168.1.1"
   ssh_keys  = ["ssh-ed25519 AAAA... user@host"]
 
   template = { id = 9000 }  # or { create = { vm_id = 9000 } }
@@ -53,7 +53,7 @@ module "fleet" {
     "nomad-server" = {
       name       = "nomad-server-01"
       vm_id      = 101
-      ip_address = "172.16.0.121/24"
+      ip_address = "192.168.1.121/24"
       vlan_id    = 20
       cores      = 2
       memory     = 2048
@@ -64,7 +64,7 @@ module "fleet" {
     "registry" = {
       hostname         = "registry"
       vm_id            = 201
-      ip_address       = "172.16.0.132/24"
+      ip_address       = "192.168.1.132/24"
       vlan_id          = 20
       template_file_id = "local:vztmpl/debian-13-standard_13.0-1_amd64.tar.zst"
       nesting          = true   # to run podman / docker inside

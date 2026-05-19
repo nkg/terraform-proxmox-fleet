@@ -4,35 +4,35 @@ variable "proxmox_insecure" {
   default     = false
 }
 
-variable "vaterland_endpoint" {
-  description = "Proxmox API endpoint for the vaterland host."
+variable "pve_01_endpoint" {
+  description = "Proxmox API endpoint for the pve-01 host."
   type        = string
 }
 
-variable "vaterland_api_token" {
-  description = "API token for the vaterland host."
-  type        = string
-  sensitive   = true
-}
-
-variable "linkstation_endpoint" {
-  description = "Proxmox API endpoint for the LinkStation N2 host."
-  type        = string
-}
-
-variable "linkstation_api_token" {
-  description = "API token for the LinkStation N2 host."
+variable "pve_01_api_token" {
+  description = "API token for the pve-01 host."
   type        = string
   sensitive   = true
 }
 
-variable "n100_b_endpoint" {
-  description = "Proxmox API endpoint for the second N100 host."
+variable "pve_02_endpoint" {
+  description = "Proxmox API endpoint for the pve-02 host."
   type        = string
 }
 
-variable "n100_b_api_token" {
-  description = "API token for the second N100 host."
+variable "pve_02_api_token" {
+  description = "API token for the pve-02 host."
+  type        = string
+  sensitive   = true
+}
+
+variable "pve_03_endpoint" {
+  description = "Proxmox API endpoint for the pve-03 host."
+  type        = string
+}
+
+variable "pve_03_api_token" {
+  description = "API token for the pve-03 host."
   type        = string
   sensitive   = true
 }

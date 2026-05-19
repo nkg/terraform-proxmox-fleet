@@ -27,7 +27,7 @@ module "fleet" {
   source = "../.."
 
   node_name = "proxmox-01"
-  gateway   = "172.16.0.1"
+  gateway   = "192.168.1.1"
   ssh_keys  = var.ssh_keys
 
   template = {
@@ -38,7 +38,7 @@ module "fleet" {
     "vm-01" = {
       name       = "vm-01"
       vm_id      = 200
-      ip_address = "172.16.0.101/24"
+      ip_address = "192.168.1.101/24"
     }
   }
 }
