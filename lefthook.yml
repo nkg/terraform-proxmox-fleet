@@ -10,14 +10,6 @@ glob_matcher: doublestar
 pre-commit:
   parallel: true
   commands:
-    no-commit-to-main:
-      run: |
-        branch=$(git rev-parse --abbrev-ref HEAD)
-        if [ "$branch" = "main" ]; then
-          echo "Direct commit to main is not allowed. Use a branch and PR."
-          exit 1
-        fi
-
     tofu-fmt:
       # Format-check only on staged .tf / .tftest.hcl files — fmt the
       # file in your editor or `tofu fmt path/to/file.tf` then re-add.

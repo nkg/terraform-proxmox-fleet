@@ -18,7 +18,7 @@ permissions:
 # All `tofu` jobs pin the same version so a Tofu point-release can't
 # silently change CI behaviour. Bump intentionally.
 env:
-  TOFU_VERSION: 1.10.5
+  TOFU_VERSION: 1.12.0
 
 jobs:
   # ─── Static checks (fast, run on every push / PR) ────────────────
@@ -27,8 +27,8 @@ jobs:
     name: tofu fmt -check
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: opentofu/setup-opentofu@v1
+      - uses: actions/checkout@v6
+      - uses: opentofu/setup-opentofu@v2
         with:
           tofu_version: ${{ env.TOFU_VERSION }}
       - run: tofu fmt -check -recursive
@@ -37,8 +37,8 @@ jobs:
     name: tflint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: terraform-linters/setup-tflint@v4
+      - uses: actions/checkout@v6
+      - uses: terraform-linters/setup-tflint@v6
         with:
           tflint_version: latest
       # `--init` resolves any plugins declared in .tflint.hcl. Cheap on
@@ -64,8 +64,8 @@ jobs:
       run:
         working-directory: ${{ matrix.dir }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: opentofu/setup-opentofu@v1
+      - uses: actions/checkout@v6
+      - uses: opentofu/setup-opentofu@v2
         with:
           tofu_version: ${{ env.TOFU_VERSION }}
       # -backend=false because no backend is configured at module level
@@ -80,8 +80,8 @@ jobs:
     name: tofu test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: opentofu/setup-opentofu@v1
+      - uses: actions/checkout@v6
+      - uses: opentofu/setup-opentofu@v2
         with:
           tofu_version: ${{ env.TOFU_VERSION }}
       - name: Skip if no .tftest.hcl files
@@ -114,7 +114,7 @@ jobs:
       security-events: write
       actions: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Run Trivy in IaC config mode
         uses: aquasecurity/trivy-action@v0.36.0
         with:
@@ -127,7 +127,7 @@ jobs:
           output: trivy-iac.sarif
       - name: Upload SARIF to GitHub Security
         if: always() && github.event_name != 'pull_request'
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: trivy-iac.sarif
 
@@ -140,7 +140,7 @@ jobs:
     permissions:
       pull-requests: read
     steps:
-      - uses: amannn/action-semantic-pull-request@v5
+      - uses: amannn/action-semantic-pull-request@v6
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
