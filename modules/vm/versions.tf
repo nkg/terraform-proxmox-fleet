@@ -1,5 +1,3 @@
-# `~> 0.106` accepts 0.106.x patches without picking up 0.107's
-# potentially-breaking changes. Bump intentionally.
 terraform {
   required_version = ">= 1.5"
 

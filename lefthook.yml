@@ -42,16 +42,46 @@ pre-push:
           done < "$LEFTHOOK_STDIN"
         fi
 
-    tofu-validate-module:
+    tofu-validate-root:
       # `tofu init -backend=false` keeps this offline (no credentials,
       # no .terraform.lock.hcl churn). Validate is fast — well under a
-      # second on this codebase.
+      # second per directory.
       run: |
         tofu init -backend=false -input=false >/dev/null
         tofu validate
 
-    tofu-validate-example:
-      root: "examples/basic/"
+    tofu-validate-vm:
+      root: "modules/vm/"
+      run: |
+        tofu init -backend=false -input=false >/dev/null
+        tofu validate
+
+    tofu-validate-lxc:
+      root: "modules/lxc/"
+      run: |
+        tofu init -backend=false -input=false >/dev/null
+        tofu validate
+
+    tofu-validate-template:
+      root: "modules/template/"
+      run: |
+        tofu init -backend=false -input=false >/dev/null
+        tofu validate
+
+    tofu-validate-example-single-vm:
+      root: "examples/single-vm/"
+      run: |
+        tofu init -backend=false -input=false >/dev/null
+        tofu validate
+
+    tofu-validate-example-single-lxc:
+      root: "examples/single-lxc/"
+      run: |
+        tofu init -backend=false -input=false >/dev/null
+        tofu validate
+
+    tofu-validate-example-platform:
+      root: "examples/gha-runner-platform/"
       run: |
         tofu init -backend=false -input=false >/dev/null
         tofu validate

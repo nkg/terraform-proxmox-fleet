@@ -4,27 +4,20 @@ variable "proxmox_endpoint" {
 }
 
 variable "proxmox_insecure" {
-  description = "Skip TLS verification against the Proxmox API. Set true for self-signed."
+  description = "Skip TLS verification (self-signed certs)."
   type        = bool
   default     = false
 }
 
 variable "proxmox_api_token" {
-  description = <<-EOT
-    Proxmox API token in `user@realm!tokenname=secret-value` form.
-
-    Preferred over user/pass — tokens are revocable per-name and don't
-    depend on a Proxmox web session. Source via TF_VAR_proxmox_api_token
-    (or PROXMOX_VE_API_TOKEN, which the bpg provider reads natively
-    when this variable is null).
-  EOT
+  description = "Proxmox API token (`user@realm!tokenname=secret`). Source via TF_VAR_proxmox_api_token."
   type        = string
   sensitive   = true
   default     = null
 }
 
 variable "proxmox_username" {
-  description = "Proxmox username (`user@realm`). Used only when `proxmox_api_token` is null."
+  description = "Proxmox username. Used only when `proxmox_api_token` is null."
   type        = string
   default     = "terraform@pam"
 }
@@ -37,7 +30,7 @@ variable "proxmox_password" {
 }
 
 variable "ssh_keys" {
-  description = "SSH public keys for the `deploy` user inside the runner VM."
+  description = "SSH public keys for the `deploy` user."
   type        = list(string)
   default     = []
 }
