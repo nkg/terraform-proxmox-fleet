@@ -1,0 +1,13 @@
+# Pinned toolchain for contributors. After cloning:
+#   mise install
+#   lefthook install
+#
+# Tools used:
+#   - opentofu: the module itself; `tofu fmt`, `tofu validate`, `tofu test`
+#   - tflint:   static analysis (also runs in CI)
+#   - lefthook: pre-commit / pre-push hooks defined in lefthook.yml
+
+[tools]
+opentofu = "1.10.5"
+tflint   = "0"
+lefthook = "1"
