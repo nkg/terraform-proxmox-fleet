@@ -1,0 +1,68 @@
+glob_matcher: doublestar
+
+# pre-commit: fast checks only. Mirror what CI runs so the fail signal
+# arrives in milliseconds locally instead of minutes in Actions.
+#
+# Tools assumed on PATH: tofu, tflint. Pin via .mise.toml (or your
+# preferred runtime manager) so `mise install` bootstraps a fresh clone.
+# To skip a hook for one commit: `LEFTHOOK_EXCLUDE=<command> git commit ...`
+
+pre-commit:
+  parallel: true
+  commands:
+    tofu-fmt:
+      # Format-check only on staged .tf / .tftest.hcl files — fmt the
+      # file in your editor or `tofu fmt path/to/file.tf` then re-add.
+      glob: "**/*.{tf,tftest.hcl}"
+      run: tofu fmt -check {staged_files}
+
+    tflint:
+      # tflint walks whole roots, not individual files. Run once if any
+      # .tf changed under a root; --recursive picks up examples/.
+      glob: "**/*.tf"
+      run: tflint --recursive
+
+pre-push:
+  commands:
+    no-push-to-main:
+      # Two guards: refuse pushes *on* main, refuse pushes that target
+      # refs/heads/main on the remote (catches `git push origin feature:main`).
+      run: |
+        branch=$(git rev-parse --abbrev-ref HEAD)
+        if [ "$branch" = "main" ]; then
+          echo "Direct push to main is not allowed. Use a branch and PR."
+          exit 1
+        fi
+        if [ -s "$LEFTHOOK_STDIN" ]; then
+          while read -r local_ref local_sha remote_ref remote_sha; do
+            if echo "$remote_ref" | grep -qE '^refs/heads/main$'; then
+              echo "Direct push to main is not allowed. Use a branch and PR."
+              exit 1
+            fi
+          done < "$LEFTHOOK_STDIN"
+        fi
+
+    tofu-validate-module:
+      # `tofu init -backend=false` keeps this offline (no credentials,
+      # no .terraform.lock.hcl churn). Validate is fast — well under a
+      # second on this codebase.
+      run: |
+        tofu init -backend=false -input=false >/dev/null
+        tofu validate
+
+    tofu-validate-example:
+      root: "examples/basic/"
+      run: |
+        tofu init -backend=false -input=false >/dev/null
+        tofu validate
+
+    tofu-test:
+      # No-op if no .tftest.hcl files exist yet. Once we add them, this
+      # gates pushes on the test suite — same as CI's `tofu test` job.
+      run: |
+        if compgen -G "tests/*.tftest.hcl" > /dev/null || compgen -G "*.tftest.hcl" > /dev/null; then
+          tofu init -backend=false -input=false >/dev/null
+          tofu test
+        else
+          echo "(no .tftest.hcl files — skipping tofu test)"
+        fi

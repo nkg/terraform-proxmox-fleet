@@ -1,0 +1,56 @@
+# Dependabot config — two ecosystems matter here:
+#
+#   - github-actions: keep CI action versions current (security +
+#     deprecation visibility). Bumps land as PRs against main.
+#   - terraform: track the bpg/proxmox provider's release cadence. We
+#     pin via `~> 0.106` deliberately, so the value here is *visibility*
+#     when 0.107 / 0.108 ship — operator decides whether to widen the
+#     constraint, not Dependabot.
+#
+# Go modules: n/a (this repo has no Go).
+# Docker:    n/a (no Dockerfiles).
+
+version: 2
+
+updates:
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: "Europe/Dublin"
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - github-actions
+    commit-message:
+      prefix: ci
+      include: scope
+    groups:
+      # Cluster the routine action bumps so we get one PR per week
+      # instead of N. Major bumps stay separate so we can read the
+      # release notes deliberately.
+      actions-minor-and-patch:
+        update-types:
+          - minor
+          - patch
+
+  - package-ecosystem: terraform
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: "Europe/Dublin"
+    open-pull-requests-limit: 3
+    labels:
+      - dependencies
+      - terraform
+    commit-message:
+      prefix: chore
+      include: scope
+    # Don't auto-widen the bpg/proxmox constraint. Dependabot will only
+    # open a PR when a new release lands that doesn't satisfy `~> 0.106`
+    # (i.e. 0.107.0+). The PR is a heads-up, not an instruction.
+    ignore: []
