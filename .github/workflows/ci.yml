@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  fmt:
+    name: tofu fmt -check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: opentofu/setup-opentofu@v1
+        with:
+          tofu_version: 1.10.5
+      - run: tofu fmt -check -recursive
+
+  validate-module:
+    name: tofu validate (module)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: opentofu/setup-opentofu@v1
+        with:
+          tofu_version: 1.10.5
+      # Validate the module itself. `-backend=false` skips backend init
+      # (none configured at module level — backend lives in consumers).
+      - run: tofu init -backend=false
+      - run: tofu validate
+
+  validate-example:
+    name: tofu validate (examples/basic)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: examples/basic
+    steps:
+      - uses: actions/checkout@v4
+      - uses: opentofu/setup-opentofu@v1
+        with:
+          tofu_version: 1.10.5
+      - run: tofu init -backend=false
+      - run: tofu validate
+
+  tflint:
+    name: tflint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: terraform-linters/setup-tflint@v4
+        with:
+          tflint_version: latest
+      - run: tflint --init
+      # --recursive walks examples/ as well.
+      - run: tflint --recursive

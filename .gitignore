@@ -1,0 +1,24 @@
+# Tofu / Terraform local state — never commit. Real state lives in a
+# remote backend (Spacelift, S3, etc.) configured by the consumer, not
+# in this module.
+*.tfstate
+*.tfstate.*
+*.tfstate.lock.info
+
+# Provider plugins and module downloads — re-fetched by `tofu init`.
+.terraform/
+.terraform.lock.hcl
+
+# Variable files with real values. `.tfvars.example` is fine to commit.
+*.tfvars
+!*.tfvars.example
+
+# Crash logs.
+crash.log
+crash.*.log
+
+# OS / editor noise.
+.DS_Store
+.idea/
+.vscode/
+*.swp
