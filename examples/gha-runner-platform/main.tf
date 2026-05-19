@@ -16,11 +16,11 @@ terraform {
 # the matching provider alias.
 
 provider "proxmox" {
-  alias    = "vaterland"
-  endpoint = var.vaterland_endpoint
+  alias    = "pve_01"
+  endpoint = var.pve_01_endpoint
   insecure = var.proxmox_insecure
 
-  api_token = var.vaterland_api_token
+  api_token = var.pve_01_api_token
 
   ssh {
     agent = true
@@ -28,11 +28,11 @@ provider "proxmox" {
 }
 
 provider "proxmox" {
-  alias    = "linkstation"
-  endpoint = var.linkstation_endpoint
+  alias    = "pve_02"
+  endpoint = var.pve_02_endpoint
   insecure = var.proxmox_insecure
 
-  api_token = var.linkstation_api_token
+  api_token = var.pve_02_api_token
 
   ssh {
     agent = true
@@ -40,11 +40,11 @@ provider "proxmox" {
 }
 
 provider "proxmox" {
-  alias    = "n100_b"
-  endpoint = var.n100_b_endpoint
+  alias    = "pve_03"
+  endpoint = var.pve_03_endpoint
   insecure = var.proxmox_insecure
 
-  api_token = var.n100_b_api_token
+  api_token = var.pve_03_api_token
 
   ssh {
     agent = true
@@ -62,23 +62,23 @@ locals {
   vlan_runners  = 30
 
   # All three Proxmox hosts share LAN, gateway, and the NAS export
-  # from vaterland (172.16.0.20:/tank/runners/buildkit-cache).
-  gateway = "172.16.0.1"
+  # from pve-01 (192.168.1.10:/srv/nfs/buildkit-cache).
+  gateway = "192.168.1.1"
 
   # LXC template (built once with distrobuilder, lives on each host's
   # `local` storage, or shared via NFS template store).
   lxc_template = "local:vztmpl/runner-base-1.0.tar.zst"
 }
 
-# ─── vaterland — Nomad server + token-server + registry ──────────────
+# ─── pve-01 — Nomad server + token-server + registry ──────────────
 
-module "vaterland" {
+module "pve_01" {
   source = "../.."
   providers = {
-    proxmox = proxmox.vaterland
+    proxmox = proxmox.pve_01
   }
 
-  node_name = "vaterland"
+  node_name = "pve-01"
   gateway   = local.gateway
   ssh_keys  = var.ssh_keys
 
@@ -93,9 +93,9 @@ module "vaterland" {
 
   vms = {
     "nomad-server" = {
-      name       = "nomad-server-vaterland"
+      name       = "nomad-server-pve-01"
       vm_id      = 1101
-      ip_address = "172.16.0.121/24"
+      ip_address = "192.168.1.121/24"
       vlan_id    = local.vlan_services
       cores      = 2
       memory     = 2048
@@ -107,7 +107,7 @@ module "vaterland" {
     "token-server" = {
       hostname         = "token-server"
       vm_id            = 1201
-      ip_address       = "172.16.0.131/24"
+      ip_address       = "192.168.1.131/24"
       vlan_id          = local.vlan_services
       template_file_id = local.lxc_template
       cores            = 1
@@ -121,7 +121,7 @@ module "vaterland" {
     "registry" = {
       hostname         = "registry"
       vm_id            = 1202
-      ip_address       = "172.16.0.132/24"
+      ip_address       = "192.168.1.132/24"
       vlan_id          = local.vlan_services
       template_file_id = local.lxc_template
       cores            = 1
@@ -131,13 +131,13 @@ module "vaterland" {
       fuse             = true
       tags             = ["registry", "service"]
 
-      # Registry storage on the vaterland NFS export (already mounted
+      # Registry storage on the pve-01 NFS export (already mounted
       # on the Proxmox host at /mnt/pve/runner-nfs). The bind path is
       # invisible to non-host code; only the registry process inside
       # the LXC sees /var/lib/registry.
       mount_points = [
         {
-          volume = "/mnt/pve/runner-nfs/registry"
+          volume = "/mnt/pve/nfs-cache/registry"
           path   = "/var/lib/registry"
           backup = false # data lives on NAS, not on the LXC root disk
         }
@@ -147,7 +147,7 @@ module "vaterland" {
     "dispatcher" = {
       hostname         = "gha-dispatcher"
       vm_id            = 1203
-      ip_address       = "172.16.0.133/24"
+      ip_address       = "192.168.1.133/24"
       vlan_id          = local.vlan_services
       template_file_id = local.lxc_template
       cores            = 1
@@ -158,15 +158,15 @@ module "vaterland" {
   }
 }
 
-# ─── linkstation-n2 — Nomad server + Nomad client ────────────────────
+# ─── pve-02 — Nomad server + Nomad client ────────────────────
 
-module "linkstation" {
+module "pve_02" {
   source = "../.."
   providers = {
-    proxmox = proxmox.linkstation
+    proxmox = proxmox.pve_02
   }
 
-  node_name   = "linkstation-n2"
+  node_name   = "pve-02"
   gateway     = local.gateway
   ssh_keys    = var.ssh_keys
   vm_storage  = "local-zfs" # 4TB SSD data pool
@@ -181,9 +181,9 @@ module "linkstation" {
 
   vms = {
     "nomad-server" = {
-      name       = "nomad-server-linkstation"
+      name       = "nomad-server-pve-02"
       vm_id      = 2101
-      ip_address = "172.16.0.122/24"
+      ip_address = "192.168.1.122/24"
       vlan_id    = local.vlan_services
       cores      = 2
       memory     = 2048
@@ -193,9 +193,9 @@ module "linkstation" {
 
   lxcs = {
     "nomad-client" = {
-      hostname         = "nomad-client-linkstation"
+      hostname         = "nomad-client-pve-02"
       vm_id            = 2201
-      ip_address       = "172.16.0.151/24"
+      ip_address       = "192.168.1.151/24"
       vlan_id          = local.vlan_runners
       template_file_id = local.lxc_template
       cores            = 6 # leave 2 for nomad-server VM + host
@@ -206,11 +206,11 @@ module "linkstation" {
       fuse             = true
       tags             = ["nomad-client", "runner"]
 
-      # Shared build cache mounted from vaterland NFS so all runner
+      # Shared build cache mounted from pve-01 NFS so all runner
       # hosts hit the same BuildKit / dependency cache.
       mount_points = [
         {
-          volume = "/mnt/pve/runner-nfs/buildkit-cache"
+          volume = "/mnt/pve/nfs-cache/buildkit-cache"
           path   = "/var/cache/buildkit"
           backup = false
         }
@@ -219,15 +219,15 @@ module "linkstation" {
   }
 }
 
-# ─── n100_b — Nomad server + Nomad client ────────────────────────────
+# ─── pve-03 — Nomad server + Nomad client ────────────────────────────
 
-module "n100_b" {
+module "pve_03" {
   source = "../.."
   providers = {
-    proxmox = proxmox.n100_b
+    proxmox = proxmox.pve_03
   }
 
-  node_name = "n100-b"
+  node_name = "pve-03"
   gateway   = local.gateway
   ssh_keys  = var.ssh_keys
 
@@ -239,9 +239,9 @@ module "n100_b" {
 
   vms = {
     "nomad-server" = {
-      name       = "nomad-server-n100-b"
+      name       = "nomad-server-pve-03"
       vm_id      = 3101
-      ip_address = "172.16.0.123/24"
+      ip_address = "192.168.1.123/24"
       vlan_id    = local.vlan_services
       cores      = 2
       memory     = 2048
@@ -251,9 +251,9 @@ module "n100_b" {
 
   lxcs = {
     "nomad-client" = {
-      hostname         = "nomad-client-n100-b"
+      hostname         = "nomad-client-pve-03"
       vm_id            = 3201
-      ip_address       = "172.16.0.152/24"
+      ip_address       = "192.168.1.152/24"
       vlan_id          = local.vlan_runners
       template_file_id = local.lxc_template
       cores            = 6
@@ -266,7 +266,7 @@ module "n100_b" {
 
       mount_points = [
         {
-          volume = "/mnt/pve/runner-nfs/buildkit-cache"
+          volume = "/mnt/pve/nfs-cache/buildkit-cache"
           path   = "/var/cache/buildkit"
           backup = false
         }
@@ -277,9 +277,9 @@ module "n100_b" {
 
 # ─── Aggregated outputs ──────────────────────────────────────────────
 
-output "vaterland_vms" { value = module.vaterland.vms }
-output "vaterland_lxcs" { value = module.vaterland.lxcs }
-output "linkstation_vms" { value = module.linkstation.vms }
-output "linkstation_lxcs" { value = module.linkstation.lxcs }
-output "n100_b_vms" { value = module.n100_b.vms }
-output "n100_b_lxcs" { value = module.n100_b.lxcs }
+output "pve_01_vms" { value = module.pve_01.vms }
+output "pve_01_lxcs" { value = module.pve_01.lxcs }
+output "pve_02_vms" { value = module.pve_02.vms }
+output "pve_02_lxcs" { value = module.pve_02.lxcs }
+output "pve_03_vms" { value = module.pve_03.vms }
+output "pve_03_lxcs" { value = module.pve_03.lxcs }

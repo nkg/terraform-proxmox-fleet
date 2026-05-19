@@ -1,5 +1,5 @@
 variable "node_name" {
-  description = "Proxmox node hostname to create the VM on (e.g. `vaterland`)."
+  description = "Proxmox node hostname to create the VM on (e.g. `pve-01`)."
   type        = string
 }
 
@@ -55,7 +55,7 @@ variable "vlan_id" {
 }
 
 variable "ip_address" {
-  description = "Static IPv4 address in CIDR notation (e.g. `172.16.0.101/24`)."
+  description = "Static IPv4 address in CIDR notation (e.g. `192.168.1.101/24`)."
   type        = string
 }
 

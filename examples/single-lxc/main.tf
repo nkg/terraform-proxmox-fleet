@@ -27,7 +27,7 @@ module "fleet" {
   source = "../.."
 
   node_name = "proxmox-01"
-  gateway   = "172.16.0.1"
+  gateway   = "192.168.1.1"
   ssh_keys  = var.ssh_keys
 
   # No VMs in this example, so no template needed.
@@ -37,7 +37,7 @@ module "fleet" {
     "lxc-01" = {
       hostname         = "lxc-01"
       vm_id            = 300
-      ip_address       = "172.16.0.110/24"
+      ip_address       = "192.168.1.110/24"
       template_file_id = "local:vztmpl/debian-13-standard_13.0-1_amd64.tar.zst"
     }
   }

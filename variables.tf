@@ -4,11 +4,11 @@
 # To deploy across multiple hosts, the caller declares one provider
 # alias per host and invokes this module once per host:
 #
-#   provider "proxmox" { alias = "vaterland"   endpoint = "..." }
-#   provider "proxmox" { alias = "linkstation" endpoint = "..." }
+#   provider "proxmox" { alias = "pve-01"   endpoint = "..." }
+#   provider "proxmox" { alias = "pve_02" endpoint = "..." }
 #
-#   module "vaterland"   { source = "..." providers = { proxmox = proxmox.vaterland   } node_name = "vaterland"      vms = {...} }
-#   module "linkstation" { source = "..." providers = { proxmox = proxmox.linkstation } node_name = "linkstation-n2" vms = {...} }
+#   module "pve_01"   { source = "..." providers = { proxmox = proxmox.pve_01   } node_name = "pve-01"      vms = {...} }
+#   module "pve_02" { source = "..." providers = { proxmox = proxmox.pve_02 } node_name = "pve-02" vms = {...} }
 #
 # This shape keeps the module out of the multi-host scheduling business
 # — that's the caller's concern (and, at runtime, Nomad's).

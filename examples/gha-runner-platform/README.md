@@ -11,21 +11,21 @@ self-hosted GitHub Actions runner platform end-to-end. This is the
                             │
                             ▼  (workflow_job.queued webhooks)
                 ┌───────────────────────┐
-                │   gha-dispatcher LXC  │  (vaterland, VLAN 20)
+                │   gha-dispatcher LXC  │  (pve-01, VLAN 20)
                 │   tiny Go service     │
                 └─────────┬─────────────┘
                           │  Nomad API
                           ▼
        ┌──────────────────────────────────────┐
        │  Nomad servers — 3 VMs, one per host │
-       │  vaterland / linkstation / n100-b    │
+       │  pve-01 / pve-02 / pve-03    │
        │  VLAN 20 (services)                  │
        └──────────────────┬───────────────────┘
                           │ schedule
                           ▼
        ┌──────────────────────────────────────┐
        │  Nomad clients — LXCs with nesting    │
-       │  linkstation + n100-b                │
+       │  pve-02 + pve-03                │
        │  VLAN 30 (runners)                   │
        │  └─ ephemeral podman containers per   │
        │     job (--ephemeral --once)         │
