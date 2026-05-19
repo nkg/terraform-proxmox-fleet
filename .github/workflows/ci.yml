@@ -59,7 +59,12 @@ jobs:
         # init + validate. Add new examples here when they land.
         dir:
           - "."
-          - "examples/basic"
+          - "modules/vm"
+          - "modules/lxc"
+          - "modules/template"
+          - "examples/single-vm"
+          - "examples/single-lxc"
+          - "examples/gha-runner-platform"
     defaults:
       run:
         working-directory: ${{ matrix.dir }}

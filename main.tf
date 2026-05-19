@@ -1,88 +1,91 @@
-resource "proxmox_virtual_environment_vm" "runner" {
+locals {
+  effective_template_id = (
+    var.template == null
+    ? null
+    : (try(var.template.id, null) != null
+      ? var.template.id
+      : module.template[0].template_id
+    )
+  )
+}
+
+# ─── Optional template build ─────────────────────────────────────────
+
+module "template" {
+  source = "./modules/template"
+  count  = try(var.template.create, null) != null ? 1 : 0
+
   node_name = var.node_name
-  vm_id     = var.vm_id
-  name      = var.name
-  tags      = var.tags
+  vm_id     = var.template.create.vm_id
+  name      = var.template.create.name
 
-  clone {
-    vm_id = var.template_id
-    full  = true
-  }
+  cloud_image_url = var.template.create.cloud_image_url
+  image_file_name = var.template.create.image_file_name
+  image_datastore = var.template.create.image_datastore
+  disk_datastore  = coalesce(var.template.create.disk_datastore, var.vm_storage)
+  bridge          = var.bridge
+}
 
-  cpu {
-    cores = var.cores
-    type  = "host"
-  }
+# ─── VMs ─────────────────────────────────────────────────────────────
 
-  memory {
-    dedicated = var.memory
-  }
+module "vm" {
+  source   = "./modules/vm"
+  for_each = var.vms
 
-  disk {
-    datastore_id = var.storage
-    size         = var.disk_size
-    interface    = "scsi0"
-    ssd          = true
-    discard      = "on"
-  }
+  node_name   = var.node_name
+  vm_id       = each.value.vm_id
+  name        = each.value.name
+  template_id = local.effective_template_id
 
-  # Extra disks attach as scsi1, scsi2, ... in declaration order.
-  # Format/mount is handled by the consumer (typically ansible) once the
-  # VM is up — this module only provisions the block device.
-  #
-  # Every field is read off `disk.value` (with optional() defaults in
-  # variables.tf). The defaults must always render to a concrete value:
-  # bpg/proxmox 0.106 errors on update with "Interface was , but only
-  # [ide sata scsi virtio] are supported" if the dynamic block leaves
-  # any disk field at its schema default — the apply path serialises
-  # empty strings for un-set fields and the API rejects them.
-  dynamic "disk" {
-    for_each = var.extra_disks
-    content {
-      datastore_id = disk.value.storage
-      size         = disk.value.size
-      interface    = "scsi${disk.key + 1}"
-      ssd          = disk.value.ssd
-      iothread     = disk.value.iothread
-      backup       = disk.value.backup
-      replicate    = disk.value.replicate
-      cache        = disk.value.cache
-      aio          = disk.value.aio
-      discard      = disk.value.discard
-    }
-  }
+  cores     = each.value.cores
+  memory    = each.value.memory
+  disk_size = each.value.disk_size
+  storage   = coalesce(each.value.storage, var.vm_storage)
 
-  network_device {
-    bridge = var.bridge
-    model  = "virtio"
-  }
+  bridge  = coalesce(each.value.bridge, var.bridge)
+  vlan_id = each.value.vlan_id != null ? each.value.vlan_id : var.default_vlan_id
 
-  initialization {
-    ip_config {
-      ipv4 {
-        address = var.ip_address
-        gateway = var.gateway
-      }
-    }
+  ip_address = each.value.ip_address
+  gateway    = coalesce(each.value.gateway, var.gateway)
+  ssh_keys   = coalesce(each.value.ssh_keys, var.ssh_keys)
 
-    user_account {
-      username = "deploy"
-      keys     = var.ssh_keys
-    }
-  }
+  tags        = each.value.tags
+  extra_disks = each.value.extra_disks
 
-  agent {
-    enabled = true
-  }
+  extra_runcmd       = each.value.extra_runcmd
+  snippets_datastore = var.snippets_datastore
+}
 
-  # Intentionally no `lifecycle { ignore_changes = [initialization] }`.
-  # An earlier in-tree version of this module shipped with that ignore
-  # since its first commit, with no explanation — likely a defensive
-  # copy-paste rather than a fix for observed drift. The cost was real:
-  # `ip_address` / `ssh_keys` updates were silently swallowed and
-  # `tofu plan` reported "No changes" while Proxmox state and tfvars
-  # diverged. If a future bpg/proxmox upgrade reintroduces perma-drift
-  # on a specific initialization sub-attribute, narrow the ignore to
-  # that attribute (e.g. `initialization[0].user_account[0].password`)
-  # rather than restoring the broad ignore.
+# ─── LXCs ────────────────────────────────────────────────────────────
+
+module "lxc" {
+  source   = "./modules/lxc"
+  for_each = var.lxcs
+
+  node_name        = var.node_name
+  vm_id            = each.value.vm_id
+  hostname         = each.value.hostname
+  template_file_id = each.value.template_file_id
+
+  cores     = each.value.cores
+  memory    = each.value.memory
+  swap      = each.value.swap
+  disk_size = each.value.disk_size
+  storage   = coalesce(each.value.storage, var.lxc_storage)
+
+  bridge     = coalesce(each.value.bridge, var.bridge)
+  vlan_id    = each.value.vlan_id != null ? each.value.vlan_id : var.default_vlan_id
+  ip_address = each.value.ip_address
+  gateway    = coalesce(each.value.gateway, var.gateway)
+  nameserver = each.value.nameserver
+  ssh_keys   = coalesce(each.value.ssh_keys, var.ssh_keys)
+
+  unprivileged  = each.value.unprivileged
+  nesting       = each.value.nesting
+  fuse          = each.value.fuse
+  keyctl        = each.value.keyctl
+  start_on_boot = each.value.start_on_boot
+
+  tags         = each.value.tags
+  mount_points = each.value.mount_points
 }

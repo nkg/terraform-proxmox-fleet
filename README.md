@@ -1,88 +1,167 @@
-# terraform-proxmox-github-actions-runner
+# terraform-proxmox-fleet
 
-Terraform / OpenTofu module that provisions a single self-hosted GitHub
-Actions runner as a Proxmox VM. Compatible with `tofu` ≥ 1.5 and the
-`bpg/proxmox` provider in the `~> 0.106` track.
+Terraform / OpenTofu module that provisions a fleet of VMs and LXC
+containers on a Proxmox host. Single-host scope per module
+invocation — to deploy across multiple hosts, the caller declares one
+provider alias per host and invokes the module once per host (no
+Proxmox cluster required).
 
-The module **only provisions the VM**. Toolchain install, the GitHub
-Actions runner agent, monitoring, and pruning are out of scope — handle
-those downstream with Ansible / Komodo / whatever fits.
+Originally extracted to back a self-hosted GitHub Actions runner
+platform, but the module itself is generic Proxmox fleet
+provisioning. The runner-specific example (`examples/gha-runner-platform/`)
+shows the recommended end-to-end shape: Nomad servers as VMs, Nomad
+clients as nesting-enabled LXCs, long-lived services (token-server,
+registry, dispatcher) as small unprivileged LXCs.
 
-## Usage
+> Note: the repo is named
+> `terraform-proxmox-github-actions-runner` for historical reasons.
+> The module is now generic — rename to `terraform-proxmox-fleet` is
+> planned.
+
+Tested with `tofu` ≥ 1.5 and `bpg/proxmox ~> 0.106`.
+
+## Layout
+
+```
+.                       Top-level orchestration (module entrypoint)
+├── modules/
+│   ├── vm/             Proxmox VM clone with optional cloud-init runcmd
+│   ├── lxc/            Proxmox LXC container (unprivileged by default)
+│   └── template/       Optional cloud-image template VM (Packer is the long-term home)
+└── examples/
+    ├── single-vm/      One VM, existing template
+    ├── single-lxc/     One unprivileged LXC
+    └── gha-runner-platform/   Full three-host fleet for GHA runner platform
+```
+
+Sub-modules are independently consumable — `source = "./modules/lxc"`
+works fine if the top-level orchestration doesn't fit.
+
+## Quick start — single host
 
 ```hcl
-module "runner_01" {
-  source  = "github.com/<owner>/terraform-proxmox-github-actions-runner?ref=v0.1.0"
+module "fleet" {
+  source = "github.com/nkg/terraform-proxmox-github-actions-runner?ref=v1.0.0"
 
-  node_name   = "vaterland"
-  vm_id       = 200
-  name        = "runner-01"
-  template_id = 9000
-  ip_address  = "172.16.0.101/24"
-  gateway     = "172.16.0.1"
-  ssh_keys    = ["ssh-ed25519 AAAA... user@host"]
+  node_name = "vaterland"
+  gateway   = "172.16.0.1"
+  ssh_keys  = ["ssh-ed25519 AAAA... user@host"]
 
-  # Optional: slow-tier scratch disk for uv / build cache.
-  extra_disks = [
-    { size = 300, storage = "tank", backup = false },
-  ]
+  template = { id = 9000 }  # or { create = { vm_id = 9000 } }
+
+  vms = {
+    "nomad-server" = {
+      name       = "nomad-server-01"
+      vm_id      = 101
+      ip_address = "172.16.0.121/24"
+      vlan_id    = 20
+      cores      = 2
+      memory     = 2048
+    }
+  }
+
+  lxcs = {
+    "registry" = {
+      hostname         = "registry"
+      vm_id            = 201
+      ip_address       = "172.16.0.132/24"
+      vlan_id          = 20
+      template_file_id = "local:vztmpl/debian-13-standard_13.0-1_amd64.tar.zst"
+      nesting          = true   # to run podman / docker inside
+      keyctl           = true
+      fuse             = true
+      mount_points = [
+        { volume = "/mnt/pve/nas-cache", path = "/var/lib/registry", backup = false }
+      ]
+    }
+  }
 }
 ```
 
-See [`examples/basic/`](examples/basic) for a complete worked composition
-including provider config.
+For the **multi-host** pattern, see [`examples/gha-runner-platform/`](examples/gha-runner-platform/) — one provider alias and one module call per Proxmox host.
 
-## Inputs
+## Inputs (top-level)
 
 | Name | Type | Default | Description |
 |---|---|---|---|
-| `node_name` | `string` | — (required) | Proxmox node to create the VM on. |
-| `vm_id` | `number` | — (required) | VM ID — must be unique on the target cluster. |
-| `name` | `string` | — (required) | VM name as it appears in the Proxmox UI. |
-| `template_id` | `number` | — (required) | ID of the Proxmox template VM to clone. |
-| `ip_address` | `string` | — (required) | Static IPv4 in CIDR notation (e.g. `172.16.0.101/24`). |
+| `node_name` | `string` | — (required) | Proxmox node this invocation targets. |
 | `gateway` | `string` | — (required) | Default IPv4 gateway. |
-| `cores` | `number` | `4` | vCPU cores. |
-| `memory` | `number` | `8192` | Memory in MB. |
-| `disk_size` | `number` | `80` | Root disk size in GB. See variables.tf for the 80 GB rationale. |
-| `storage` | `string` | `"local-lvm"` | Proxmox storage pool for the root disk. |
-| `bridge` | `string` | `"vmbr0"` | Network bridge for the NIC. |
-| `ssh_keys` | `list(string)` | `[]` | SSH public keys baked into cloud-init for the `deploy` user. |
-| `tags` | `list(string)` | `["github-runner", "managed"]` | Proxmox tags on the VM. |
-| `extra_disks` | `list(object)` | `[]` | Additional disks (scsi1+). See variables.tf for the per-disk knob set. |
+| `bridge` | `string` | `"vmbr0"` | Default network bridge. |
+| `default_vlan_id` | `number` | `null` | Default VLAN tag for NICs (null = untagged). Per-entry override. |
+| `vm_storage` | `string` | `"local-lvm"` | Default Proxmox pool for VM root disks. |
+| `lxc_storage` | `string` | `"local-lvm"` | Default Proxmox pool for LXC root filesystems. |
+| `ssh_keys` | `list(string)` | `[]` | Default SSH keys for `deploy` user (VMs) / root (LXCs). |
+| `snippets_datastore` | `string` | `"local"` | Datastore for cloud-init snippet uploads (used by `extra_runcmd`). |
+| `template` | `object` | `null` | Either `{id=N}` (existing template) or `{create={...}}` (module builds one). Null = no VMs on this host. |
+| `vms` | `map(object)` | `{}` | VMs to create. Per entry: `name`, `vm_id`, `ip_address` required. |
+| `lxcs` | `map(object)` | `{}` | LXCs to create. Per entry: `hostname`, `vm_id`, `ip_address`, `template_file_id` required. |
+
+See [`variables.tf`](variables.tf) for the full per-VM / per-LXC field
+sets (`cores`, `memory`, `nesting`, `mount_points`, `extra_disks`,
+etc.).
 
 ## Outputs
 
 | Name | Description |
 |---|---|
-| `vm_id` | Proxmox VM ID of the provisioned runner. |
-| `ip_address` | Configured static IPv4 address (CIDR, as passed in). |
-| `name` | VM name. |
+| `template_id` | Effective template VM ID, or null if no VMs created. |
+| `vms` | Map of created VMs (`vm_id`, `ip_address`, `name`). |
+| `lxcs` | Map of created LXCs (`vm_id`, `ip_address`, `hostname`). |
 
 ## Design notes
 
-### `lifecycle.ignore_changes = [initialization]` is intentionally absent
+### Single-host scope per invocation
 
-A previous in-tree version of this module carried that lifecycle block.
-It silently swallowed `ip_address` and `ssh_keys` changes — `tofu plan`
-would report "No changes" while Proxmox state and tfvars genuinely
-diverged. If a future bpg/proxmox upgrade reintroduces perma-drift on a
-specific initialization sub-attribute, narrow the ignore to that
-attribute (e.g. `initialization[0].user_account[0].password`) rather
-than restoring the broad ignore.
+The module configures one provider and targets one Proxmox node.
+Multi-host fleets are composed at the **caller** level — one provider
+alias per host, one module call per host. This keeps the module out
+of cluster-state and multi-host scheduling concerns (those belong to
+Nomad / Komodo / whatever the runtime scheduler is).
 
-### `aio = "io_uring"` on extra disks
+### Pre-baked templates over cloud-init runcmd
 
-Requires a host kernel with io_uring support — fine on modern Proxmox
-(8.x+) but break-glass to `"native"` or `"threads"` on older boxes and
-for NFS-backed extra-disk pools (io_uring + NFS is unstable on some
-combinations).
+`var.template = { create = {...} }` and per-VM `extra_runcmd` are
+escape hatches for first-time setup. The recommended long-term path
+is **Packer for VMs** and **distrobuilder for LXCs** — bake your
+toolchain into the image so first boot is just network + ssh-key
+setup. Sibling repos under `nkg/` will host these template builders.
+
+### Unprivileged LXC by default
+
+`lxcs.<key>.unprivileged` defaults to `true`. Containers that need
+nested container runtimes (podman, docker) must opt into
+`nesting = true` — and almost always also `keyctl = true` and
+`fuse = true`. Privileged LXC is supported but is essentially
+"root in container ≈ root on host"; only use it when you have a
+specific reason and accept the loss of isolation.
+
+### NAS mounts use the host-bind pattern
+
+Unprivileged LXC can't mount NFS or SMB directly (the mount syscall
+needs `CAP_SYS_ADMIN` in the initial user namespace). The canonical
+workaround is for the **Proxmox host** to mount the share, and the
+LXC to bind-mount the host path. Declare these via `mount_points` —
+`volume` is an absolute host path (e.g. `/mnt/pve/nas-cache`),
+`path` is where it lands inside the container. UID mapping is the
+gotcha: a file written as uid 0 inside the container lands as uid
+100000 on the host; match the NAS share's anon uid / set
+`lxc.idmap` accordingly.
+
+### `lifecycle.ignore_changes = [initialization]` intentionally absent
+
+A previous iteration of this module carried that lifecycle block —
+it silently swallowed `ip_address` and `ssh_keys` changes and made
+`tofu plan` report "No changes" while Proxmox state and tfvars
+diverged. If a future bpg/proxmox upgrade reintroduces perma-drift
+on a specific initialization sub-attribute, narrow the ignore to
+that attribute (e.g. `initialization[0].user_account[0].password`)
+rather than restoring the broad ignore.
 
 ### Provider versioning
 
-`bpg/proxmox` is pre-1.0; the `~> 0.106` constraint accepts 0.106.x
-patch bumps without picking up 0.107's potentially-breaking changes.
-Bump intentionally — see the comment in `versions.tf`.
+`bpg/proxmox` is pre-1.0; `~> 0.106` accepts 0.106.x patch bumps
+without picking up 0.107's potentially-breaking changes. Bump
+intentionally.
 
 ## Requirements
 
@@ -90,6 +169,8 @@ Bump intentionally — see the comment in `versions.tf`.
 |---|---|
 | `tofu` (or `terraform`) | ≥ 1.5 |
 | `bpg/proxmox` | `~> 0.106` |
+| Proxmox VE | 8.x+ recommended |
+| Snippets-enabled datastore | Required only when VMs have `extra_runcmd` set |
 
 ## License
 
