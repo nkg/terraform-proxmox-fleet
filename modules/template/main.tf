@@ -22,6 +22,13 @@ resource "proxmox_virtual_environment_vm" "template" {
     enabled = true
   }
 
+  # A template never boots, so the guest-agent-reported network facts
+  # stay empty in Proxmox while bpg marks them "known after apply" on
+  # every plan — a permanent phantom in-place update on each host.
+  lifecycle {
+    ignore_changes = [ipv4_addresses, ipv6_addresses, network_interface_names]
+  }
+
   cpu {
     cores = var.cores
     type  = "host"
