@@ -23,6 +23,28 @@ variable "template_file_id" {
   type        = string
 }
 
+variable "os_type" {
+  description = <<-EOT
+    Proxmox `ostype` of the template: `debian`, `ubuntu`, `alpine`,
+    `centos`, `fedora`, `archlinux`, `devuan`, `gentoo`, `nixos`,
+    `opensuse` or `unmanaged`. It selects the PVE::LXC::Setup flavour
+    that writes hostname, network and SSH keys into the container —
+    `unmanaged` disables that entirely, so `ip_address`, `hostname`
+    and `ssh_keys` have no effect. Must match the distribution in
+    `template_file_id`. Default `debian`.
+  EOT
+  type        = string
+  default     = "debian"
+
+  validation {
+    condition = contains([
+      "alpine", "archlinux", "centos", "debian", "devuan", "fedora",
+      "gentoo", "nixos", "opensuse", "ubuntu", "unmanaged",
+    ], var.os_type)
+    error_message = "os_type must be one of the Proxmox ostype values (or `unmanaged`)."
+  }
+}
+
 variable "unprivileged" {
   description = <<-EOT
     Run as an unprivileged container (uid-mapped, root in container =

@@ -64,10 +64,13 @@ resource "proxmox_virtual_environment_container" "this" {
 
   operating_system {
     template_file_id = var.template_file_id
-    # bpg/proxmox requires this even though it's overlapping with the
-    # template name — leave it at the broad default; clones pick up the
-    # real OS info from the template.
-    type = "unmanaged"
+    # Not cosmetic: this is what makes Proxmox write the hostname, the
+    # static network config and the SSH keys into the rootfs at create
+    # and start (PVE::LXC::Setup). With `unmanaged` it writes nothing,
+    # and the container comes up with the template's placeholder
+    # hostname, an unconfigured NIC and no authorized_keys — the
+    # initialization block above is silently a no-op.
+    type = var.os_type
   }
 
   # Only volume-backed mounts (Proxmox-managed volumes) go through the

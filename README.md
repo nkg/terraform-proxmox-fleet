@@ -98,7 +98,7 @@ For the **multi-host** pattern, see [`examples/gha-runner-platform/`](examples/g
 | `lxcs` | `map(object)` | `{}` | LXCs to create. Per entry: `hostname`, `vm_id`, `ip_address`, `template_file_id` required. |
 
 See [`variables.tf`](variables.tf) for the full per-VM / per-LXC field
-sets (`cores`, `memory`, `nesting`, `mount_points`, `extra_disks`,
+sets (`os_type`, `cores`, `memory`, `nesting`, `mount_points`, `extra_disks`,
 etc.).
 
 ## Outputs

@@ -173,6 +173,9 @@ variable "lxcs" {
     Required per entry: `hostname`, `vm_id`, `ip_address`, `template_file_id`.
     LXC templates are referenced by Proxmox volume path (e.g.
     `local:vztmpl/debian-13-standard_13.0-1_amd64.tar.zst`), not by ID.
+    `os_type` (default `debian`) must name the template's distribution:
+    it selects the Proxmox setup flavour that writes hostname, network
+    and SSH keys into the rootfs — `unmanaged` writes none of them.
 
     Defaults: unprivileged, no nesting, no FUSE, no keyctl. Containers
     that need to run podman / docker / nested LXC must set
@@ -191,6 +194,7 @@ variable "lxcs" {
     vm_id            = number
     ip_address       = string
     template_file_id = string
+    os_type          = optional(string, "debian")
 
     cores     = optional(number, 2)
     memory    = optional(number, 1024)
