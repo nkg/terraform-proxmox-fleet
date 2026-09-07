@@ -22,6 +22,14 @@ resource "proxmox_virtual_environment_vm" "template" {
     enabled = true
   }
 
+  # Explicit, because bpg never records `started` for a template (read
+  # skips it, so state holds null) while the argument defaults to true.
+  # That is a `started` change on every plan, which its CustomizeDiff
+  # turns into ipv4_addresses / ipv6_addresses / network_interface_names
+  # "known after apply" — a permanent phantom in-place update per host.
+  # false matches null, and a template cannot start anyway.
+  started = false
+
   cpu {
     cores = var.cores
     type  = "host"
