@@ -170,10 +170,11 @@ variable "mount_points" {
 
 variable "host_ssh" {
   description = <<-EOT
-    SSH access to the Proxmox host, used only to run `pct set` for the
-    feature flags Proxmox will not accept from a non-root API token
-    (`fuse`, `keyctl`). The user needs passwordless sudo. Required when
-    either of those is true; ignored otherwise.
+    SSH access to the Proxmox host, used only to run `pct set` for what
+    Proxmox will not accept from a non-root API token: the `fuse` /
+    `keyctl` feature flags and bind mounts (host path → container). The
+    user needs passwordless sudo. Required when an LXC uses any of
+    those; ignored otherwise.
   EOT
   type = object({
     host        = string

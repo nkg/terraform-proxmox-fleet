@@ -63,10 +63,10 @@ variable "snippets_datastore" {
 
 variable "host_ssh" {
   description = <<-EOT
-    SSH access to this Proxmox host for the one thing the API will not
-    do on a scoped token: setting LXC `fuse` / `keyctl` feature flags
+    SSH access to this Proxmox host for what the API will not do on a
+    scoped token: LXC `fuse` / `keyctl` feature flags and bind mounts
     (Proxmox allows those for root@pam only). Required when any entry
-    in `lxcs` sets either; ignored otherwise. The user needs
+    in `lxcs` uses one of them; ignored otherwise. The user needs
     passwordless sudo — the same account and key the bpg provider's
     `ssh {}` block uses is the natural choice.
   EOT
