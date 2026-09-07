@@ -92,7 +92,7 @@ For the **multi-host** pattern, see [`examples/gha-runner-platform/`](examples/g
 | `lxc_storage` | `string` | `"local-lvm"` | Default Proxmox pool for LXC root filesystems. |
 | `ssh_keys` | `list(string)` | `[]` | Default SSH keys for `deploy` user (VMs) / root (LXCs). |
 | `snippets_datastore` | `string` | `"local"` | Datastore for the per-VM cloud-init snippet (installs qemu-guest-agent; carries `extra_runcmd`). |
-| `host_ssh` | `object` | `null` | `{ host, user, private_key }` for `pct set` on the host — required when any LXC sets `fuse` or `keyctl` (Proxmox allows those for root@pam only, so a scoped API token cannot). |
+| `host_ssh` | `object` | `null` | `{ host, user, private_key }` for `pct set` on the host — required when any LXC sets `fuse` / `keyctl` or has a bind mount (Proxmox allows those for root@pam only, so a scoped API token cannot). |
 | `template` | `object` | `null` | Either `{id=N}` (existing template) or `{create={...}}` (module builds one). Null = no VMs on this host. |
 | `vms` | `map(object)` | `{}` | VMs to create. Per entry: `name`, `vm_id`, `ip_address` required. |
 | `lxcs` | `map(object)` | `{}` | LXCs to create. Per entry: `hostname`, `vm_id`, `ip_address`, `template_file_id` required. |
@@ -143,7 +143,10 @@ needs `CAP_SYS_ADMIN` in the initial user namespace). The canonical
 workaround is for the **Proxmox host** to mount the share, and the
 LXC to bind-mount the host path. Declare these via `mount_points` —
 `volume` is an absolute host path (e.g. `/mnt/pve/nas-cache`),
-`path` is where it lands inside the container. UID mapping is the
+`path` is where it lands inside the container. Bind mounts are
+root@pam-only on the Proxmox API, so the module applies them with
+`pct set` over `host_ssh` (see the inputs table); volume-backed
+mounts go through the API as normal. UID mapping is the
 gotcha: a file written as uid 0 inside the container lands as uid
 100000 on the host; match the NAS share's anon uid / set
 `lxc.idmap` accordingly.
@@ -172,7 +175,7 @@ intentionally.
 | `bpg/proxmox` | `~> 0.106` |
 | Proxmox VE | 8.x+ recommended |
 | Snippets-enabled datastore | Required on every host that runs VMs (`pvesm set local --content ...,snippets`) |
-| SSH + passwordless sudo on the host | Required only for LXCs with `fuse` / `keyctl` — see `host_ssh` |
+| SSH + passwordless sudo on the host | Required only for LXCs with `fuse` / `keyctl` or bind mounts — see `host_ssh` |
 
 ## License
 

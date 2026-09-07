@@ -16,7 +16,7 @@ resource "proxmox_virtual_environment_container" "this" {
   }
 
   lifecycle {
-    ignore_changes = [features]
+    ignore_changes = [features, mount_point]
   }
 
   cpu {
@@ -70,12 +70,15 @@ resource "proxmox_virtual_environment_container" "this" {
     type = "unmanaged"
   }
 
-  # Mount points cover both volume-backed mounts (Proxmox-managed
-  # volumes) and bind mounts (host path → container path). The NAS use
-  # case lands on the bind variant: Proxmox host mounts the NFS share
-  # externally, then this block binds the host path into the container.
+  # Only volume-backed mounts (Proxmox-managed volumes) go through the
+  # API. Bind mounts (host path → container path) are, like the feature
+  # flags, root@pam-only on the API ("mount point type bind is only
+  # allowed for root@pam") and are applied with `pct set` below. The
+  # provider then sees mount points in the config it did not declare, so
+  # mount_point is in ignore_changes above — a change to a volume mount
+  # after creation needs a taint.
   dynamic "mount_point" {
-    for_each = var.mount_points
+    for_each = local.volume_mounts
     content {
       volume    = mount_point.value.volume
       path      = mount_point.value.path
@@ -88,28 +91,58 @@ resource "proxmox_virtual_environment_container" "this" {
   }
 }
 
-# fuse / keyctl need root@pam on the API, so they are applied on the
-# host with `pct set` as root via sudo. The full flag set (nesting
-# included) is written so the config is exactly what was asked for,
-# and the container is rebooted only when the line actually changed —
-# features take effect at container start.
+# fuse / keyctl and bind mounts need root@pam on the API, so they are
+# applied on the host with `pct` as root via sudo. The full feature set
+# (nesting included) is written so the config is exactly what was asked
+# for. Bind mounts take mp indices after the API-managed volume mounts,
+# which bpg numbers mp0.. in list order. The container is rebooted only
+# when its config actually changed — features take effect at start, and
+# a bind mount added to a running container is not visible inside until
+# then either.
 locals {
+  volume_mounts = [for m in var.mount_points : m if !startswith(m.volume, "/")]
+  bind_mounts   = [for m in var.mount_points : m if startswith(m.volume, "/")]
+
   features = join(",", compact([
     var.nesting ? "nesting=1" : "",
     var.fuse ? "fuse=1" : "",
     var.keyctl ? "keyctl=1" : "",
   ]))
+
+  bind_mount_args = [
+    for i, m in local.bind_mounts :
+    format("--mp%d '%s'", length(local.volume_mounts) + i, join(",", compact([
+      m.volume,
+      "mp=${m.path}",
+      m.read_only ? "ro=1" : "",
+      m.backup ? "backup=1" : "backup=0",
+      m.acl == null ? "" : (m.acl ? "acl=1" : "acl=0"),
+      m.replicate ? "" : "replicate=0",
+    ])))
+  ]
+
+  host_side_needed = var.fuse || var.keyctl || length(local.bind_mounts) > 0
 }
 
-resource "terraform_data" "features" {
-  count = (var.fuse || var.keyctl) ? 1 : 0
+# v0.1.1 applied the feature flags alone under this name.
+moved {
+  from = terraform_data.features
+  to   = terraform_data.host_config
+}
 
-  triggers_replace = [proxmox_virtual_environment_container.this.id, local.features]
+resource "terraform_data" "host_config" {
+  count = local.host_side_needed ? 1 : 0
+
+  triggers_replace = [
+    proxmox_virtual_environment_container.this.id,
+    local.features,
+    join(" ", local.bind_mount_args),
+  ]
 
   lifecycle {
     precondition {
       condition     = var.host_ssh != null
-      error_message = "LXC ${var.hostname}: fuse/keyctl are set with `pct set` over SSH, which needs `host_ssh` ({ host, user, private_key }) — Proxmox only allows those flags for root@pam on the API."
+      error_message = "LXC ${var.hostname}: fuse/keyctl and bind mounts are set with `pct set` over SSH, which needs `host_ssh` ({ host, user, private_key }) — Proxmox only allows those for root@pam on the API."
     }
   }
 
@@ -123,9 +156,9 @@ resource "terraform_data" "features" {
   provisioner "remote-exec" {
     inline = [
       "set -e",
-      "before=$(sudo -n pct config ${var.vm_id} | sed -n 's/^features: //p')",
-      "sudo -n pct set ${var.vm_id} --features '${local.features}'",
-      "after=$(sudo -n pct config ${var.vm_id} | sed -n 's/^features: //p')",
+      "before=$(sudo -n pct config ${var.vm_id} | grep -E '^(features|mp[0-9]+):' || true)",
+      "sudo -n pct set ${var.vm_id} --features '${local.features}' ${join(" ", local.bind_mount_args)}",
+      "after=$(sudo -n pct config ${var.vm_id} | grep -E '^(features|mp[0-9]+):' || true)",
       "if [ \"$before\" != \"$after\" ] && sudo -n pct status ${var.vm_id} | grep -q running; then sudo -n pct reboot ${var.vm_id}; fi",
     ]
   }
