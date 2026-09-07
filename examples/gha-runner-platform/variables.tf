@@ -42,3 +42,8 @@ variable "ssh_keys" {
   type        = list(string)
   default     = []
 }
+
+variable "host_ssh_private_key_path" {
+  description = "Private key for the sudo-capable SSH user on the Proxmox hosts (LXC fuse/keyctl are set with pct over SSH)."
+  type        = string
+}

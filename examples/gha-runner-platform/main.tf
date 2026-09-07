@@ -82,6 +82,14 @@ module "pve_01" {
   gateway   = local.gateway
   ssh_keys  = var.ssh_keys
 
+  # The nomad-client LXC below asks for keyctl + fuse, which Proxmox
+  # will not set for a non-root API token; the module does it over SSH.
+  host_ssh = {
+    host        = "192.0.2.11"
+    user        = "iac"
+    private_key = file(var.host_ssh_private_key_path)
+  }
+
   # Nomad server VMs use the pre-built Packer template (recommended
   # over the cloud-init bootstrap path); for the example we let the
   # module create a stock cloud-image template once.
@@ -169,6 +177,7 @@ module "pve_02" {
   node_name   = "pve-02"
   gateway     = local.gateway
   ssh_keys    = var.ssh_keys
+  host_ssh    = { host = "192.0.2.12", user = "iac", private_key = file(var.host_ssh_private_key_path) }
   vm_storage  = "local-zfs" # 4TB SSD data pool
   lxc_storage = "local-zfs"
 
@@ -230,6 +239,7 @@ module "pve_03" {
   node_name = "pve-03"
   gateway   = local.gateway
   ssh_keys  = var.ssh_keys
+  host_ssh  = { host = "192.0.2.13", user = "iac", private_key = file(var.host_ssh_private_key_path) }
 
   template = {
     create = {

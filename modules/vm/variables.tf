@@ -89,9 +89,10 @@ variable "extra_runcmd" {
 
 variable "snippets_datastore" {
   description = <<-EOT
-    Proxmox datastore for the uploaded cloud-init snippet. Only used
-    when `extra_runcmd` is non-empty. Must have `snippets` in its
-    content types — stock Proxmox has it enabled on `local`.
+    Proxmox datastore for the uploaded cloud-init snippet, which every
+    VM has (it installs qemu-guest-agent and carries `extra_runcmd`).
+    Must have `snippets` in its content types — stock Proxmox has it
+    enabled on `local`; check with `pvesm status --content snippets`.
   EOT
   type        = string
   default     = "local"

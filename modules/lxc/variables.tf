@@ -46,13 +46,13 @@ variable "nesting" {
 }
 
 variable "fuse" {
-  description = "Enable FUSE inside the container (`features.fuse = 1`). Required for fuse-overlayfs and similar."
+  description = "Enable FUSE inside the container (`features.fuse = 1`). Required for fuse-overlayfs and similar. Applied with `pct set` over SSH — needs `host_ssh`."
   type        = bool
   default     = false
 }
 
 variable "keyctl" {
-  description = "Enable keyctl inside the container (`features.keyctl = 1`). Required by some container runtimes (esp. unprivileged Docker)."
+  description = "Enable keyctl inside the container (`features.keyctl = 1`). Required by some container runtimes (esp. unprivileged Docker). Applied with `pct set` over SSH — needs `host_ssh`."
   type        = bool
   default     = false
 }
@@ -166,4 +166,20 @@ variable "mount_points" {
     replicate = optional(bool, true)
   }))
   default = []
+}
+
+variable "host_ssh" {
+  description = <<-EOT
+    SSH access to the Proxmox host, used only to run `pct set` for the
+    feature flags Proxmox will not accept from a non-root API token
+    (`fuse`, `keyctl`). The user needs passwordless sudo. Required when
+    either of those is true; ignored otherwise.
+  EOT
+  type = object({
+    host        = string
+    user        = optional(string, "root")
+    private_key = string
+  })
+  default   = null
+  sensitive = true
 }

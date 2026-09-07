@@ -91,7 +91,8 @@ For the **multi-host** pattern, see [`examples/gha-runner-platform/`](examples/g
 | `vm_storage` | `string` | `"local-lvm"` | Default Proxmox pool for VM root disks. |
 | `lxc_storage` | `string` | `"local-lvm"` | Default Proxmox pool for LXC root filesystems. |
 | `ssh_keys` | `list(string)` | `[]` | Default SSH keys for `deploy` user (VMs) / root (LXCs). |
-| `snippets_datastore` | `string` | `"local"` | Datastore for cloud-init snippet uploads (used by `extra_runcmd`). |
+| `snippets_datastore` | `string` | `"local"` | Datastore for the per-VM cloud-init snippet (installs qemu-guest-agent; carries `extra_runcmd`). |
+| `host_ssh` | `object` | `null` | `{ host, user, private_key }` for `pct set` on the host — required when any LXC sets `fuse` or `keyctl` (Proxmox allows those for root@pam only, so a scoped API token cannot). |
 | `template` | `object` | `null` | Either `{id=N}` (existing template) or `{create={...}}` (module builds one). Null = no VMs on this host. |
 | `vms` | `map(object)` | `{}` | VMs to create. Per entry: `name`, `vm_id`, `ip_address` required. |
 | `lxcs` | `map(object)` | `{}` | LXCs to create. Per entry: `hostname`, `vm_id`, `ip_address`, `template_file_id` required. |
@@ -170,7 +171,8 @@ intentionally.
 | `tofu` (or `terraform`) | ≥ 1.5 |
 | `bpg/proxmox` | `~> 0.106` |
 | Proxmox VE | 8.x+ recommended |
-| Snippets-enabled datastore | Required only when VMs have `extra_runcmd` set |
+| Snippets-enabled datastore | Required on every host that runs VMs (`pvesm set local --content ...,snippets`) |
+| SSH + passwordless sudo on the host | Required only for LXCs with `fuse` / `keyctl` — see `host_ssh` |
 
 ## License
 
