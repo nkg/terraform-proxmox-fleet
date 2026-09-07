@@ -1,7 +1,15 @@
+# Every VM gets a cloud-init snippet. It exists for one reason before
+# any `extra_runcmd`: the resource below enables the QEMU guest agent
+# and the provider then waits for it, but stock cloud images (Ubuntu,
+# Debian) do not ship qemu-guest-agent — without installing it here the
+# create hangs until the agent timeout and fails.
 locals {
-  cloud_init_user_data = length(var.extra_runcmd) > 0 ? join("\n", concat(
+  cloud_init_user_data = join("\n", concat(
     [
       "#cloud-config",
+      "package_update: true",
+      "packages:",
+      "  - qemu-guest-agent",
       "users:",
       "  - name: deploy",
       "    sudo: ALL=(ALL) NOPASSWD:ALL",
@@ -12,14 +20,13 @@ locals {
     [for k in var.ssh_keys : "      - ${k}"],
     [
       "runcmd:",
+      "  - systemctl enable --now qemu-guest-agent",
     ],
     [for c in var.extra_runcmd : "  - ${c}"],
-  )) : null
+  ))
 }
 
 resource "proxmox_virtual_environment_file" "user_data" {
-  count = length(var.extra_runcmd) > 0 ? 1 : 0
-
   content_type = "snippets"
   datastore_id = var.snippets_datastore
   node_name    = var.node_name
@@ -84,10 +91,13 @@ resource "proxmox_virtual_environment_vm" "this" {
     vlan_id = var.vlan_id
   }
 
-  # When extra_runcmd is set the snippet provides user creation; the
-  # provider's user_account block is dropped to avoid colliding with
-  # the snippet's `users:` section in the merged cloud-init.
+  # The snippet creates the `deploy` user, so there is no user_account
+  # block here — the two would collide in the merged cloud-init. The
+  # cloud-init drive itself goes on the VM's own datastore: the
+  # provider's default is `local-lvm`, which ZFS-only hosts lack.
   initialization {
+    datastore_id = var.storage
+
     ip_config {
       ipv4 {
         address = var.ip_address
@@ -95,15 +105,7 @@ resource "proxmox_virtual_environment_vm" "this" {
       }
     }
 
-    user_data_file_id = length(var.extra_runcmd) > 0 ? proxmox_virtual_environment_file.user_data[0].id : null
-
-    dynamic "user_account" {
-      for_each = length(var.extra_runcmd) > 0 ? [] : [1]
-      content {
-        username = "deploy"
-        keys     = var.ssh_keys
-      }
-    }
+    user_data_file_id = proxmox_virtual_environment_file.user_data.id
   }
 
   agent {

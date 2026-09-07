@@ -84,6 +84,7 @@ module "lxc" {
   nesting       = each.value.nesting
   fuse          = each.value.fuse
   keyctl        = each.value.keyctl
+  host_ssh      = var.host_ssh
   start_on_boot = each.value.start_on_boot
 
   tags         = each.value.tags

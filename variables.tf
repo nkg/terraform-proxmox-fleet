@@ -56,9 +56,27 @@ variable "ssh_keys" {
 }
 
 variable "snippets_datastore" {
-  description = "Datastore for cloud-init snippet uploads (VM `extra_runcmd`). Must allow `snippets` content type."
+  description = "Datastore for the per-VM cloud-init snippet (every VM gets one: it installs qemu-guest-agent and carries `extra_runcmd`). Must allow the `snippets` content type on this host."
   type        = string
   default     = "local"
+}
+
+variable "host_ssh" {
+  description = <<-EOT
+    SSH access to this Proxmox host for the one thing the API will not
+    do on a scoped token: setting LXC `fuse` / `keyctl` feature flags
+    (Proxmox allows those for root@pam only). Required when any entry
+    in `lxcs` sets either; ignored otherwise. The user needs
+    passwordless sudo — the same account and key the bpg provider's
+    `ssh {}` block uses is the natural choice.
+  EOT
+  type = object({
+    host        = string
+    user        = optional(string, "root")
+    private_key = string
+  })
+  default   = null
+  sensitive = true
 }
 
 # ─── Template: bring your own, or have the module build one ──────────
@@ -159,6 +177,8 @@ variable "lxcs" {
     Defaults: unprivileged, no nesting, no FUSE, no keyctl. Containers
     that need to run podman / docker / nested LXC must set
     `nesting = true` (and often `keyctl = true`, `fuse = true`).
+    `keyctl` / `fuse` cannot be set through the API by a non-root
+    token, so they are applied on the host over SSH — set `host_ssh`.
 
     NAS bind-mount pattern: declare a `mount_point` with `volume` set
     to the host path (`/mnt/pve/nas-cache`) and `path` set to the
