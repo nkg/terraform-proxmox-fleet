@@ -7,6 +7,11 @@ locals {
   cloud_init_user_data = join("\n", concat(
     [
       "#cloud-config",
+      # A custom user-data snippet replaces the one Proxmox generates,
+      # and that is where the VM's hostname was set. Without these the
+      # clone keeps the cloud image's default (`ubuntu`, `debian`).
+      "hostname: ${var.name}",
+      "manage_etc_hosts: true",
       "package_update: true",
       "packages:",
       "  - qemu-guest-agent",
