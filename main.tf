@@ -66,6 +66,7 @@ module "lxc" {
   vm_id            = each.value.vm_id
   hostname         = each.value.hostname
   template_file_id = each.value.template_file_id
+  os_type          = each.value.os_type
 
   cores     = each.value.cores
   memory    = each.value.memory
